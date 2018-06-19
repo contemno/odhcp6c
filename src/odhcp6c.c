@@ -60,7 +60,7 @@ static volatile bool signal_usr1 = false;
 static volatile bool signal_usr2 = false;
 static volatile bool signal_term = false;
 
-static int urandom_fd = -1, allow_slaac_only = 0;
+static int urandom_fd = -1, allow_slaac_only = 0, priority = 0;
 static bool bound = false, release = true, ra = false;
 static time_t last_update = 0;
 static char *ifname = NULL;
@@ -138,8 +138,12 @@ int main(_unused int argc, char* const argv[])
 	unsigned int ra_options = RA_RDNSS_DEFAULT_LIFETIME;
 	unsigned int ra_holdoff_interval = RA_MIN_ADV_INTERVAL;
 
-	while ((c = getopt(argc, argv, "S::N:V:P:FB:c:i:r:Ru:x:s:kt:m:Lhedp:fav")) != -1) {
+	while ((c = getopt(argc, argv, "C:S::N:V:P:FB:c:i:r:Ru:x:s:kt:m:Lhedp:fav")) != -1) {
 		switch (c) {
+		case 'C':
+			priority = (optarg) ? atoi(optarg) : 0;
+			break;
+
 		case 'S':
 			allow_slaac_only = (optarg) ? atoi(optarg) : -1;
 			break;
@@ -360,7 +364,7 @@ int main(_unused int argc, char* const argv[])
 	signal(SIGUSR2, sighandler);
 
 	if ((urandom_fd = open("/dev/urandom", O_CLOEXEC | O_RDONLY)) < 0 ||
-			init_dhcpv6(ifname, client_options, sol_timeout) ||
+			init_dhcpv6(ifname, client_options, sol_timeout, priority) ||
 			ra_init(ifname, &ifid, ra_options, ra_holdoff_interval) ||
 			script_init(script, ifname)) {
 		syslog(LOG_ERR, "failed to initialize: %s", strerror(errno));
@@ -549,6 +553,9 @@ static int usage(void)
 	const char buf[] =
 	"Usage: odhcp6c [options] <interface>\n"
 	"\nFeature options:\n"
+	"	-C <priority> 	Sets the internal packet priority (SO_PRIORITY). Can be used in\n"
+	"			conjunction with egress-qos-mapping to set the CoS field in the\n"
+	"			ethernet header. (0)\n"
 	"	-S <time>	Wait at least <time> sec for a DHCP-server (0)\n"
 	"	-N <mode>	Mode for requesting addresses [try|force|none]\n"
 	"	-P <length>	Request IPv6-Prefix (0 = auto)\n"
